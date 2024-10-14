@@ -66,8 +66,8 @@
 
 3. **环境变量**：
     脚本使用以下环境变量：
-    - `USERNAME`：你的登录用户名（默认值为 `m220951640`）。
-    - `PASSWORD`：你的登录密码（默认值为 `wangguiyou123`）。
+    - `USERNAME`：你的登录用户名（必填 ）。
+    - `PASSWORD`：你的登录密码（必填）。
     - `TOKEN`：可选，如果已有 token，脚本将使用该 token。
     - `ROOM_ID`：需要预约的房间ID。
     - `START_TIME`：预约的开始时间。
