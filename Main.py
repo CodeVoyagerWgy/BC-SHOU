@@ -163,14 +163,15 @@ def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3
 
 if __name__ == "__main__":
     # 从 .env 文件中加载用户名和密码
-    username = os.getenv("USERNAME", "m220951640")
-    password = os.getenv("PASSWORD", "wangguiyou123")
+    username = os.getenv("USERNAME", "")
+    password = os.getenv("PASSWORD", "")
     token = os.getenv("TOKEN", None)  # 从 .env 文件读取 token
 
-    room_id = '1805787236174073857'
-    start_time = '18:00'
-    end_time = '18:30'
-    apply_date = '2024-10-16'
+    # 从 .env 文件读取房间ID、开始时间、结束时间和预约日期
+    room_id = os.getenv("ROOM_ID", '1805787236174073857')
+    start_time = os.getenv("START_TIME", '18:00')
+    end_time = os.getenv("END_TIME", '18:30')
+    apply_date = os.getenv("APPLY_DATE", '2024-10-16')
 
     session = requests.session()
 
