@@ -4,7 +4,6 @@ import os
 import ddddocr
 import base64
 
-from django.contrib.messages import MessageFailure
 from dotenv import load_dotenv, set_key
 
 # 加载 .env 文件
@@ -21,6 +20,7 @@ LOGIN_URL = "https://uis.shou.edu.cn/token/password/passwordLogin"
 QUERY_RESERVATION_URL = "https://meeting-reservation.shou.edu.cn/api/home/reserve4site"
 CAPTCHA_URL_TEMPLATE = "https://meeting-reservation.shou.edu.cn/api/room/captcha/{}"
 RESERVATION_URL = "https://meeting-reservation.shou.edu.cn/api/reservation"
+MY_INFO_URL = "https://authx-service.shou.edu.cn/personal/api/v1/me/user"
 
 def get_mfa(username,password):
     data = {
@@ -59,11 +59,27 @@ def login(username, password,mfaState):
             print(f"登录失败: {response_body.get('message', '未知错误')}")
             return None, None
     except requests.RequestException as e:
-        print(f"登录请求失败: {e}")
+        print(f"登录请求失败，请检查密码是否正确: {e}")
         return None, None
     except json.JSONDecodeError:
         print("无法解析登录响应")
         return None, None
+def get_info(session,token):
+    query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
+    try:
+        response = session.get(MY_INFO_URL, headers=query_headers)
+        json_data = json.loads(response.text)
+        leaderId = json_data['data']['attributes']['userId']
+        userName = json_data['data']['attributes']['userName']
+        applicant = json_data['data']['attributes']['organizationId']
+        applicantLabel = json_data['data']['attributes']['organizationName']
+    except requests.RequestException as e:
+        print(f"查询失败: {e}")
+
+
+
+
+
 
 
 # 查询预定函数
@@ -120,6 +136,18 @@ def ocr_recognize(captcha_base64):
 
 # 提交预约函数
 def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3):
+    query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
+    try:
+        response = session.get(MY_INFO_URL, headers=query_headers)
+        json_data = json.loads(response.text)
+        leaderId = json_data['data']['attributes']['userId']
+        userName = json_data['data']['attributes']['userName']
+        applicant = json_data['data']['attributes']['organizationId']
+        applicantLabel = json_data['data']['attributes']['organizationName']
+        print(f"用户ID:{leaderId};用户名称:{userName};学院编号:{applicant};学院名称:{applicantLabel}")
+    except requests.RequestException as e:
+        print(f"获取个人信息: {e}")
+
     captcha_base64 = get_captcha(session, token, room_id)
 
     if not captcha_base64:
@@ -133,9 +161,13 @@ def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3
             return
 
         reservation_data = {
-            "leaderName": "王贵友",
-            "leaderId": "ec3906404af011ed6b031648282c5aa9",
+            "leaderName": userName,
+            "leaderId": leaderId,
+            "actualUserPhone": "",
             "captcha": capacha_code,
+            "docUrl": [],
+            "actualUserName": "",
+            "participant": [],
             "applyExtendList": [
                 {
                     "endTime": end_time,
@@ -144,15 +176,19 @@ def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3
                 }
             ],
             "subject": "羽毛球运动",
-            "applicant": "100500",
+            "actualUserAccountName": "",
+            "applicant": applicant,
             "roomId": room_id,
             "allowAgentRa": 0,
+            "actualUserId": "",
+            "participantLeader": [],
+            "isCycle": 0,
             "seatCount": 4,
-            "phone": "17861006056",
-            "leaderNo": "M220951640",
+            "phone": os.getenv("PHONE", ""),
+            "leaderNo": os.getenv("USERNAME", ""),
             "useRuleId": "1836673554756079618",
             "remark": "",
-            "applicantLabel": "信息学院"
+            "applicantLabel": applicantLabel
         }
 
         query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
@@ -190,6 +226,8 @@ if __name__ == "__main__":
 
     session = requests.session()
 
+    get_info(session,token)
+
     # 如果没有 token，则进行登录操作
     if not token:
         mfaState = get_mfa(username, password)
@@ -201,5 +239,5 @@ if __name__ == "__main__":
         print("使用已有的 TOKEN 进行操作")
 
     if session and token:
-        query_reservation(session, token, apply_date)
+        # query_reservation(session, token, apply_date)
         reserve(session, token, room_id, start_time, end_time, apply_date)
