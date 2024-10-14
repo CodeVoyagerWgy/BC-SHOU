@@ -3,6 +3,8 @@ import json
 import os
 import ddddocr
 import base64
+
+from django.contrib.messages import MessageFailure
 from dotenv import load_dotenv, set_key
 
 # 加载 .env 文件
@@ -14,18 +16,31 @@ BASE_HEADERS = {
 }
 
 # URL常量
+MFA_URL = "https://uis.shou.edu.cn/token/mfa/detect"
 LOGIN_URL = "https://uis.shou.edu.cn/token/password/passwordLogin"
 QUERY_RESERVATION_URL = "https://meeting-reservation.shou.edu.cn/api/home/reserve4site"
 CAPTCHA_URL_TEMPLATE = "https://meeting-reservation.shou.edu.cn/api/room/captcha/{}"
 RESERVATION_URL = "https://meeting-reservation.shou.edu.cn/api/reservation"
 
+def get_mfa(username,password):
+    data = {
+        "username": username,
+        "password": password,
+        'deviceId': 'DB9C9B29-85A7-44B2-907D-2D3F8BF1B371',
+    }
+    response = requests.post(MFA_URL, headers=BASE_HEADERS, data=data)
+    json_data = json.loads(response.text)
+    mfaState = json_data["data"]['state']
+    return mfaState
+
 # 登录函数
-def login(username, password):
+def login(username, password,mfaState):
     login_data = {
         'appId': 'com.supwisdom.ahd',
         'clientId': 'CLIENT_ID',
-        'deviceId': 'BBE18D7D-6696-4B4C-828B-348A116CD485',
-        'mfaState': '9zT101',
+        # 'deviceId': 'BBE18D7D-6696-4B4C-828B-348A116CD485',
+        'deviceId': 'DB9C9B29-85A7-44B2-907D-2D3F8BF1B371',
+        'mfaState': mfaState,
         'osType': 'iOS',
         'password': password,
         'username': username
@@ -177,7 +192,8 @@ if __name__ == "__main__":
 
     # 如果没有 token，则进行登录操作
     if not token:
-        session, token = login(username, password)
+        mfaState = get_mfa(username, password)
+        session, token = login(username, password,mfaState)
         if token:
             # 登录成功后，将 token 写入 .env 文件
             set_key('.env', 'TOKEN', token)

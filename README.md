@@ -32,7 +32,7 @@
 3. **设置 `.env` 文件**：
     在项目根目录下创建 `.env` 文件，并根据实际情况填入以下内容：
     ```
-    USERNAME=你的用户名
+    USERNAME=你的学号
     PASSWORD=你的密码
     TOKEN=已有的 token（可选）
     ROOM_ID=房间ID
