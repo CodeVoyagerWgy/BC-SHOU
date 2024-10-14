@@ -43,8 +43,8 @@
 
     示例：
     ```
-    USERNAME=m220951640
-    PASSWORD=wangguiyou123
+    USERNAME=你的学号
+    PASSWORD=你的密码
     TOKEN=
     ROOM_ID=1805787236174073857
     START_TIME=18:00
