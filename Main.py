@@ -83,14 +83,29 @@ def get_info(session,token):
 
 
 # 查询预定函数
-def query_reservation(session, token, date):
+def query_reservation(session, token, date,name):
     query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
     params = {'projectId': '1800403370013822977', 'date': date}
 
+
     try:
         response = session.get(QUERY_RESERVATION_URL, headers=query_headers, params=params)
-        response.raise_for_status()
-        print(response.text)
+        data = json.loads(response.text)
+        reservation_list = data['data']['30']['reservationList']
+        name_to_find = name
+        id_found = None
+
+        for reservation in reservation_list:
+            if reservation['name'] == name_to_find:
+                id_found = reservation['id']
+                break
+
+        if id_found:
+            return id_found
+        else:
+            print("ID not found.")
+            return None
+
     except requests.RequestException as e:
         print(f"查询失败: {e}")
 
@@ -219,14 +234,13 @@ if __name__ == "__main__":
     token = os.getenv("TOKEN", None)  # 从 .env 文件读取 token
 
     # 从 .env 文件读取房间ID、开始时间、结束时间和预约日期
-    room_id = os.getenv("ROOM_ID", '1805787236174073857')
+    room = os.getenv("ROOM", '羽毛球馆（第17片）')
     start_time = os.getenv("START_TIME", '18:00')
     end_time = os.getenv("END_TIME", '18:30')
     apply_date = os.getenv("APPLY_DATE", '2024-10-16')
 
     session = requests.session()
 
-    get_info(session,token)
 
     # 如果没有 token，则进行登录操作
     if not token:
@@ -239,5 +253,9 @@ if __name__ == "__main__":
         print("使用已有的 TOKEN 进行操作")
 
     if session and token:
-        # query_reservation(session, token, apply_date)
-        reserve(session, token, room_id, start_time, end_time, apply_date)
+        room_id =query_reservation(session, token, apply_date,room)
+        if room_id:
+            print(f"查询到房间ID为:{room_id}")
+            reserve(session, token, room_id, start_time, end_time, apply_date)
+        else:
+            print("房间查找失败")
