@@ -3,16 +3,38 @@ import json
 import os
 import ddddocr
 import base64
+import time
+import schedule
 
 from dotenv import load_dotenv, set_key
 
 # 加载 .env 文件
 load_dotenv()
 
+# 标志变量，表示是否任务已执行
+done = False
+
 # 全局常量
 BASE_HEADERS = {
     'User-Agent': 'SWSuperApp/1.0.19 (iPad; iOS 18.0; Scale/2.00)'
 }
+
+ROOM_DATA = [{'id': '1805786225388752897', 'name': '羽毛球馆（第1片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805786563000864769', 'name': '羽毛球馆（第2片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805786726624858113', 'name': '羽毛球馆（第3片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805786849387941890', 'name': '羽毛球馆（第4片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805786997765640193', 'name': '羽毛球馆（第5片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787086051545090', 'name': '羽毛球馆（第6片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787158638170113', 'name': '羽毛球馆（第7片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787236174073857', 'name': '羽毛球馆（第8片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787290704220161', 'name': '羽毛球馆（第9片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787332970221569', 'name': '羽毛球馆（第10片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805787783732072450', 'name': '羽毛球馆（第11片）', 'useRuleId': '1836673554756079618'},
+             {'id': '1805788599830384641', 'name': '羽毛球馆（第17片）', 'useRuleId': '1799980541204172801'},
+             {'id': '1805788636819951618', 'name': '羽毛球馆（第18片）', 'useRuleId': '1799980541204172801'},
+             {'id': '1805788681132773378', 'name': '羽毛球馆（第19片）', 'useRuleId': '1799980541204172801'},
+             {'id': '1805788719334494209', 'name': '羽毛球馆（第20片）', 'useRuleId': '1799980541204172801'},
+             {'id': '1805788766054846465', 'name': '羽毛球馆（第21片）', 'useRuleId': '1799980541204172801'}]
 
 # URL常量
 MFA_URL = "https://uis.shou.edu.cn/token/mfa/detect"
@@ -22,7 +44,8 @@ CAPTCHA_URL_TEMPLATE = "https://meeting-reservation.shou.edu.cn/api/room/captcha
 RESERVATION_URL = "https://meeting-reservation.shou.edu.cn/api/reservation"
 MY_INFO_URL = "https://authx-service.shou.edu.cn/personal/api/v1/me/user"
 
-def get_mfa(username,password):
+
+def get_mfa(username, password):
     data = {
         "username": username,
         "password": password,
@@ -33,8 +56,9 @@ def get_mfa(username,password):
     mfaState = json_data["data"]['state']
     return mfaState
 
+
 # 登录函数
-def login(username, password,mfaState):
+def login(username, password, mfaState):
     login_data = {
         'appId': 'com.supwisdom.ahd',
         'clientId': 'CLIENT_ID',
@@ -64,7 +88,9 @@ def login(username, password,mfaState):
     except json.JSONDecodeError:
         print("无法解析登录响应")
         return None, None
-def get_info(session,token):
+
+
+def get_info(session, token):
     query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
     try:
         response = session.get(MY_INFO_URL, headers=query_headers)
@@ -77,37 +103,17 @@ def get_info(session,token):
         print(f"查询失败: {e}")
 
 
-
-
-
-
-
 # 查询预定函数
-def query_reservation(session, token, date,name):
-    query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
-    params = {'projectId': '1800403370013822977', 'date': date}
+def query_reservation(name):
+    for room in ROOM_DATA:
+        if room['name'] == name:
+            useRuleId = room['useRuleId']
+            roomId = room['id']
+            break
+    else:
+        raise ValueError(f"没有找到名称为{name}的房间")
 
-
-    try:
-        response = session.get(QUERY_RESERVATION_URL, headers=query_headers, params=params)
-        data = json.loads(response.text)
-        reservation_list = data['data']['30']['reservationList']
-        name_to_find = name
-        id_found = None
-
-        for reservation in reservation_list:
-            if reservation['name'] == name_to_find:
-                id_found = reservation['id']
-                break
-
-        if id_found:
-            return id_found
-        else:
-            print("ID not found.")
-            return None
-
-    except requests.RequestException as e:
-        print(f"查询失败: {e}")
+    return  roomId,useRuleId
 
 
 # 获取验证码函数
@@ -150,7 +156,7 @@ def ocr_recognize(captcha_base64):
 
 
 # 提交预约函数
-def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3):
+def reserve(session, token, room_id, role_id,start_time, end_time, apply_date, retries=3):
     query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
     try:
         response = session.get(MY_INFO_URL, headers=query_headers)
@@ -201,7 +207,7 @@ def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3
             "seatCount": 4,
             "phone": os.getenv("PHONE", ""),
             "leaderNo": os.getenv("USERNAME", ""),
-            "useRuleId": "1836673554756079618",
+            "useRuleId": role_id,
             "remark": "",
             "applicantLabel": applicantLabel
         }
@@ -227,25 +233,25 @@ def reserve(session, token, room_id, start_time, end_time, apply_date, retries=3
             break
 
 
-if __name__ == "__main__":
+def start():
+    global done
     # 从 .env 文件中加载用户名和密码
     username = os.getenv("USERNAME", "")
     password = os.getenv("PASSWORD", "")
     token = os.getenv("TOKEN", None)  # 从 .env 文件读取 token
 
     # 从 .env 文件读取房间ID、开始时间、结束时间和预约日期
-    room = os.getenv("ROOM", '羽毛球馆（第17片）')
+    room = os.getenv("ROOM", '羽毛球馆（第5片）')
     start_time = os.getenv("START_TIME", '18:00')
     end_time = os.getenv("END_TIME", '18:30')
     apply_date = os.getenv("APPLY_DATE", '2024-10-16')
 
     session = requests.session()
 
-
     # 如果没有 token，则进行登录操作
     if not token:
         mfaState = get_mfa(username, password)
-        session, token = login(username, password,mfaState)
+        session, token = login(username, password, mfaState)
         if token:
             # 登录成功后，将 token 写入 .env 文件
             set_key('.env', 'TOKEN', token)
@@ -253,9 +259,29 @@ if __name__ == "__main__":
         print("使用已有的 TOKEN 进行操作")
 
     if session and token:
-        room_id =query_reservation(session, token, apply_date,room)
+        room_id,role_id = query_reservation(room)
         if room_id:
             print(f"查询到房间ID为:{room_id}")
-            reserve(session, token, room_id, start_time, end_time, apply_date)
+            reserve(session, token, room_id, role_id,start_time, end_time, apply_date)
         else:
             print("房间查找失败")
+    done = True
+
+
+# 计算当前时间到11点的剩余时间
+
+
+# 定时任务，每秒打印剩余时间
+
+if __name__ == '__main__':
+    # 设置23点执行 start 函数
+    schedule.every().day.at("23:00").do(start)
+
+    print("定时开启，23点开始预约")
+
+    # 保持程序运行，直到任务执行完毕
+    while not done:
+        schedule.run_pending()
+        time.sleep(0.1)  # 减小睡眠时间以提高检查频率
+
+    print("任务执行完毕，程序已退出")
