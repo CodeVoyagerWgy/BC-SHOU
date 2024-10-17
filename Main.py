@@ -11,8 +11,6 @@ from dotenv import load_dotenv, set_key
 # 加载 .env 文件
 load_dotenv()
 
-# 标志变量，表示是否任务已执行
-done = False
 
 # 全局常量
 BASE_HEADERS = {
@@ -233,8 +231,8 @@ def reserve(session, token, room_id, role_id,start_time, end_time, apply_date, r
             break
 
 
-def start():
-    global done
+def main():
+
     # 从 .env 文件中加载用户名和密码
     username = os.getenv("USERNAME", "")
     password = os.getenv("PASSWORD", "")
@@ -260,28 +258,56 @@ def start():
 
     if session and token:
         room_id,role_id = query_reservation(room)
+        flag = query_start(session, token, apply_date)
+        while not flag:
+            print_time_message("预约未开始...")
+            time.sleep(10)
+            flag = query_start(session, token, apply_date)
+        print_time_message("预约已开始!!!")
         if room_id:
             print(f"查询到房间ID为:{room_id}")
             reserve(session, token, room_id, role_id,start_time, end_time, apply_date)
         else:
             print("房间查找失败")
-    done = True
+def print_time_message(message):
+    # 获取当前时间戳
+    now = time.time()
 
+    # 将时间戳转换为本地时间
+    local_time = time.localtime(now)
 
-# 计算当前时间到11点的剩余时间
+    # 格式化时间输出
+    formatted_time = time.strftime("%Y-%m-%d %H:%M:%S", local_time)
 
+def query_start(session, token, date):
+    query_headers = {**BASE_HEADERS, 'X-Id-Token': token}
+    params = {'projectId': '1800403370013822977', 'date': date}
+    try:
+        response = session.get(QUERY_RESERVATION_URL, headers=query_headers, params=params)
+        data = json.loads(response.text)
+        reservation_list = data['data']['30']['reservationList']
+        isStarted = False
 
-# 定时任务，每秒打印剩余时间
+        for reservation in reservation_list:
+            if reservation['timeRanges'] != None:
+                print(reservation['timeRanges'])
+                isStarted = True
+                break
+        return isStarted
+    except requests.RequestException as e:
+        print(f"查询失败: {e}")
+
 
 if __name__ == '__main__':
+    main()
     # 设置23点执行 start 函数
-    schedule.every().day.at("23:00").do(start)
-
-    print("定时开启，23点开始预约")
-
-    # 保持程序运行，直到任务执行完毕
-    while not done:
-        schedule.run_pending()
-        time.sleep(0.1)  # 减小睡眠时间以提高检查频率
-
-    print("任务执行完毕，程序已退出")
+    # schedule.every().day.at("23:00").do(start)
+    #
+    # print("定时开启，23点开始预约")
+    #
+    # # 保持程序运行，直到任务执行完毕
+    # while not done:
+    #     schedule.run_pending()
+    #     time.sleep(0.1)  # 减小睡眠时间以提高检查频率
+    #
+    # print("任务执行完毕，程序已退出")
