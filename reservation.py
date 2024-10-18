@@ -48,6 +48,7 @@ def reserve(session, token, room_id, role_id, start_time, end_time, apply_date, 
             "participant": [],
             "applyExtendList": [
                 {
+                    "seatNumber": "",
                     "endTime": end_time,
                     "applyDate": apply_date,
                     "beginTime": start_time
