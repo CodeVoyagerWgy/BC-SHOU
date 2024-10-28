@@ -76,16 +76,21 @@ def reserve(session, token, room_id, role_id, start_time, end_time, apply_date, 
 
             if response_data['code'] == 200:
                 logger.info(f"预约成功")
-                return  # 成功预约后，退出循环
+                return  1# 成功预约后，退出循环
             elif response_data['code'] == 400 and response_data['msg'] == '验证码错误':
                 retry_count += 1
                 logger.error(f"验证码错误，重试中... ({retry_count}/{max_retries})")
+            elif response_data['code'] == 400 and response_data['msg'].contains('已被其他人预约'):
+                # 切换房间号重新预约
+                logger.error(f"预约时间段已满")
+                return 2
             else:
-                logger.error(f"预约失败: {response_data.get('msg', '未知错误')}")
-                break  # 其他错误不进行重试，直接退出
+                logger.error(f"预约失败: 状态码-{response_data['code']};{response_data.get('msg', '未知错误')}")
+                return -1
 
         except Exception as e:
             retry_count += 1
             logger.error(f"预约请求失败: {e}，重试中... ({retry_count}/{max_retries})")
 
     logger.error(f"预约失败，已结束")
+    return -1

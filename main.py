@@ -6,6 +6,7 @@ import time
 
 import requests
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 
 from login import get_mfa, login
@@ -32,6 +33,11 @@ def main():
 
     session = requests.session()
 
+    three_days_later = datetime.now() + timedelta(days=3)
+
+    # 格式化日期为YYYY-MM-DD
+    formatted_date = three_days_later.strftime('%Y-%m-%d')
+
     if not token:
         logger.info("未发现Token，尝试登录")
         mfa_state = get_mfa(username, password)
@@ -49,13 +55,17 @@ def main():
             logger.info("预约未开始，等待中...")
             time.sleep(5)
             flag = query_start(session, token, apply_date)
-        reserve(session, token, room_id, role_id, start_time, end_time, apply_date, phone)
-        logger.info('预约成功,程序结束')
-
+        # 优先预约设定的房间
+        result = reserve(session, token, room_id, role_id, start_time, end_time, apply_date, phone)
+        # 设定的房间没有预约成功，尝试预约其他房间
+        if(result==2):
+            for room in ROOM_DATA:
+                result =reserve(session, token, room[id], role_id, start_time, end_time, apply_date, phone)
+                if(result!=2):
+                    break
 if __name__ == '__main__':
     main()
 
 
 
-if __name__ == '__main__':
-    main()
+
