@@ -1,14 +1,9 @@
-
-
 import os
-import time
-
-
+from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
-
-
+import schedule
+import time
 from login import get_mfa, login
 from query_start import query_start
 from reservation import reserve
@@ -16,10 +11,9 @@ from config import ROOM_DATA
 from logger import get_logger
 
 logger = get_logger(__name__)
-# Setup logging
 
 
-def main():
+def reserveTask():
     load_dotenv()
     username = os.getenv("USERNAME", "")
     password = os.getenv("PASSWORD", "")
@@ -28,44 +22,55 @@ def main():
     room = os.getenv("ROOM", 'default_room')
     start_time = os.getenv("START_TIME", '18:00')
     end_time = os.getenv("END_TIME", '18:30')
-    apply_date = os.getenv("APPLY_DATE", '2024-10-16')
     phone = os.getenv("PHONE", "")
 
     session = requests.session()
+    apply_date = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
 
-    three_days_later = datetime.now() + timedelta(days=3)
-
-    # 格式化日期为YYYY-MM-DD
-    formatted_date = three_days_later.strftime('%Y-%m-%d')
-
+    # 检查并获取Token
     if not token:
         logger.info("未发现Token，尝试登录")
         mfa_state = get_mfa(username, password)
         session, token = login(username, password, mfa_state)
 
     if session and token:
-        try:
-            room_id, role_id = next((r['id'], r['useRuleId']) for r in ROOM_DATA if r['name'] == room)
-        except StopIteration:
+        room_data = next((r for r in ROOM_DATA if r['name'] == room), None)
+        if not room_data:
             logger.error(f"Room {room} not found in ROOM_DATA.")
             return
 
-        flag = query_start(session, token, apply_date)
-        while not flag:
+        # 等待预约开始
+        while not query_start(session, token, apply_date):
             logger.info("预约未开始，等待中...")
-            time.sleep(5)
-            flag = query_start(session, token, apply_date)
-        # 优先预约设定的房间
-        result = reserve(session, token, room_id, role_id, start_time, end_time, apply_date, phone)
-        # 设定的房间没有预约成功，尝试预约其他房间
-        if(result==2):
-            for room in ROOM_DATA:
-                result =reserve(session, token, room[id], role_id, start_time, end_time, apply_date, phone)
-                if(result!=2):
+            time.sleep(3)
+
+        # 预约指定房间
+        result = reserve(session, token, room_data['id'], room_data['useRuleId'], start_time, end_time, apply_date,
+                         phone)
+
+        # 若指定房间未预约成功，尝试其他房间
+        if result == 2:
+            for alt_room in ROOM_DATA:
+                result = reserve(session, token, alt_room['id'], alt_room['useRuleId'], start_time, end_time,
+                                 apply_date, phone)
+                if result != 2:
                     break
+
+
+def schedule_daily_task(task, hour, minute):
+    schedule_time = f"{hour:02}:{minute:02}"
+    schedule.every().day.at(schedule_time).do(task)
+    logger.info(f"Task scheduled daily at {schedule_time}")
+
+    # 手动触发任务（若代码在指定时间之后运行）
+    now = datetime.now()
+    if now.hour > hour or (now.hour == hour and now.minute >= minute):
+        task()
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
 if __name__ == '__main__':
-    main()
-
-
-
-
+    schedule_daily_task(reserveTask, 20, 0)
