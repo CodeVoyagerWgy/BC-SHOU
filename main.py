@@ -60,12 +60,8 @@ def reserveTask():
 def schedule_daily_task(task, hour, minute):
     schedule_time = f"{hour:02}:{minute:02}"
     schedule.every().day.at(schedule_time).do(task)
-    logger.info(f"Task scheduled daily at {schedule_time}")
+    logger.info(f"程序运行时间： {schedule_time}")
 
-    # 手动触发任务（若代码在指定时间之后运行）
-    now = datetime.now()
-    if now.hour > hour or (now.hour == hour and now.minute >= minute):
-        task()
 
     while True:
         schedule.run_pending()

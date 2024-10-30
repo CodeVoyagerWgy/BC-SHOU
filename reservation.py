@@ -73,6 +73,9 @@ def reserve(session, token, room_id, role_id, start_time, end_time, apply_date, 
         try:
             response = session.post(RESERVATION_URL, json=reservation_data, headers=query_headers)
             response_data = response.json()
+            logger.info(f"预约请求返回: {response_data['msg']}")
+            if '已被其他人预约' in str(response_data['msg']):
+                return 2
 
             if response_data['code'] == 200:
                 logger.info(f"预约成功")
@@ -80,7 +83,7 @@ def reserve(session, token, room_id, role_id, start_time, end_time, apply_date, 
             elif response_data['code'] == 400 and response_data['msg'] == '验证码错误':
                 retry_count += 1
                 logger.error(f"验证码错误，重试中... ({retry_count}/{max_retries})")
-            elif response_data['code'] == 400 and response_data['msg'].contains('已被其他人预约'):
+            elif response_data['code'] == 400 and '已被其他人预约' in str(response_data['msg']):
                 # 切换房间号重新预约
                 logger.error(f"预约时间段已满")
                 return 2
