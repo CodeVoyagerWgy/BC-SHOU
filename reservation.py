@@ -73,9 +73,6 @@ def reserve(session, token, room_id, role_id, start_time, end_time, apply_date, 
         try:
             response = session.post(RESERVATION_URL, json=reservation_data, headers=query_headers)
             response_data = response.json()
-            logger.info(f"预约请求返回: {response_data['msg']}")
-            if '已被其他人预约' in str(response_data['msg']):
-                return 2
 
             if response_data['code'] == 200:
                 logger.info(f"预约成功")
