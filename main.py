@@ -61,7 +61,9 @@ def schedule_daily_task(task, hour, minute):
     schedule_time = f"{hour:02}:{minute:02}"
     schedule.every().day.at(schedule_time).do(task)
     logger.info(f"程序运行时间： {schedule_time}")
-
+    now = datetime.now()
+    if now.hour > hour or (now.hour == hour and now.minute >= minute):
+        task()
 
     while True:
         schedule.run_pending()
